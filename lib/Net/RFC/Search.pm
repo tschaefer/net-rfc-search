@@ -54,7 +54,7 @@ C<rfcbaseurl> - URL of the RFC site/mirror where index file and RFC's are going 
 
 =item search_by_header("keyword")
 
-Returns array of RFC index numbers "keyword" has been found in.
+Returns hash of RFC index numbers and description "keyword" has been found in.
 
 Search occurs in RFC header names (i.e. through RFC index file).
 
@@ -150,7 +150,7 @@ sub search_by_header {
 
     my $fh = IO::File->new($self->{indexpath}, "r");
 
-    my ($thing, @found_indices);
+    my ($thing, %found_rfcs);
     my $found = 0;
 
     for my $line(<$fh>) {
@@ -159,8 +159,17 @@ sub search_by_header {
             $found = 1 if ($line =~ /$string/i);
         }
         else {
-            $thing =~ /^(\d+)/ if $thing;
-            push @found_indices, $1 if ($1 && $found);
+            $thing =~ /^(\d+) (.+)/gms if $thing;
+            if ($1 && $found) {
+                my $index = $1;
+
+                my $desc = $2;
+                $desc =~ s/\r?\n|\r/ /gm;
+                $desc =~ s/\s{2,}//g;
+                $desc =~ s/^\s+|\s+$//g;
+
+                $found_rfcs{$index} = $desc;
+            }
 
             $found = 0;
             $thing = '';
@@ -168,7 +177,7 @@ sub search_by_header {
     }
 
     undef $fh;
-    return @found_indices;
+    return %found_rfcs;
 }
 
 sub get_by_index {
