@@ -13,10 +13,12 @@ my $rfc_search = Net::RFC::Search->new;
 #
 # Search in RFC header by keyword
 #
-my @search_result = $rfc_search->search_by_header('WebSocket');
+my %founds = $rfc_search->search_by_header('\d+ The WebSocket Protocol\.');
+my @search_result = keys %founds;
 is_deeply(\@search_result, [6455], 'Found RFC 6455 for WebSocket protocol by "WebSocket" keyword');
 
-@search_result = $rfc_search->search_by_header('icmp');
+my %founds = $rfc_search->search_by_header('icmp');
+@search_result = keys %founds;
 cmp_ok(scalar @search_result, ">", 1, 'Found multiple RFC containing ICMP keyword in their headers');
 
 #
