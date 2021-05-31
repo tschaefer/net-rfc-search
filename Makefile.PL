@@ -23,7 +23,11 @@ WriteMakefile(
         'File::Tempdir'             => 0,
         'Carp'                      => 0,
         'File::HomeDir'                       => 0,
+        'File::Which'               => 0,
+        'IPC::Run'                  => 0,
+        'Path::Tiny'                => 0,
     },
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => 'Net-RFC-Search-*' },
+    EXE_FILES => ['bin/rfc'],
 );

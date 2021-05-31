@@ -1,0 +1,184 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+use Pod::Usage;
+
+use File::Which qw(which);
+use IPC::Run;
+use Net::RFC::Search;
+use Path::Tiny qw(path tempfile);
+
+use Data::Printer;
+
+my %opts;
+my %cfg = (
+    lib   => path( '~', '.rfc' )->absolute->stringify,
+    index => path( '~', '.rfc', 'index' )->absolute->stringify,
+);
+
+sub print_usage {
+    pod2usage( -exitval => 255, -verbose => 0 );
+    return;
+}
+
+sub print_help {
+    pod2usage(
+        -exitval  => 0,
+        -verbose  => 99,
+        -sections => 'SYNOPSIS|OPTIONS|PARAMETERS',
+    );
+    return;
+}
+
+sub print_man {
+    pod2usage( -exitval => 0, -verbose => 2 );
+    return;
+}
+
+sub print_version {
+    print "rfc: 0.001\n";
+
+    return;
+}
+
+sub get_options {
+    GetOptions(
+        'help|h'        => \$opts{'help'},
+        'man|m'         => \$opts{'man'},
+        'version|v'     => \$opts{'version'},
+        'force-index|i' => \$opts{'force_index'},
+        'keep|k'        => \$opts{'keep'},
+        'search|s=s'    => \$opts{'search'},
+    ) or return print_usage();
+
+    foreach my $key ( keys %opts ) {
+        delete $opts{$key} if ( !$opts{$key} );
+    }
+    my $count = keys %opts;
+
+    return usage()
+      if ( ( $opts{'help'} || $opts{'man'} || $opts{'version'} )
+        && $count > 1 );
+    return print_help()    if ( $opts{'help'} );
+    return print_man()     if ( $opts{'man'} );
+    return print_version() if ( $opts{'version'} );
+
+    if ( $opts{'search'} ) {
+        print_usage() if ( $ARGV[0] );
+        return;
+    }
+
+    print_usage() if ( !$ARGV[0] );
+
+    $opts{'index'} = $ARGV[0];
+    print_usage() if ( $opts{'index'} !~ /^[0-9]+$/ );
+
+    return;
+}
+
+sub search {
+    my $rfc = Net::RFC::Search->new( indexpath => $cfg{'index'} );
+
+    my %found = $rfc->search_by_header( $opts{'search'} );
+
+    while ( my ( $index, $desc ) = each %found ) {
+        printf "%s: %s\n\n", $index, $desc;
+    }
+
+    return;
+}
+
+sub get {
+    my $rfc = Net::RFC::Search->new( indexpath => $cfg{'index'} );
+
+    my $text = $rfc->get_by_index( $opts{'index'} );
+
+    my $pager = $ENV{'PAGER'};
+    if ( !$pager || !which($pager) ) {
+        for (qw(less more)) {
+            $pager = which($_);
+            last if ($pager);
+        }
+    }
+
+    my $rfc_file;
+    if ( $opts{'keep'} ) {
+        $rfc_file = path( $cfg{'lib'}, $opts{'index'} . '.txt' );
+        $rfc_file->spew($text);
+    }
+    elsif ($pager) {
+        $rfc_file = tempfile();
+        $rfc_file->spew($text);
+    }
+
+    if ($pager) {
+        IPC::Run::run( [ $pager, $rfc_file->stringify ] );
+    }
+    else {
+        print $text;
+    }
+
+    return;
+}
+
+sub run {
+    get_options();
+
+    path( $cfg{'lib'} )->mkpath();
+
+    path( $cfg{'index'})->remove if ($opts{'force_index'});
+
+    if ( $opts{'search'} ) {
+        search();
+    }
+    else {
+        get();
+    }
+
+    return 0;
+}
+
+exit run();
+
+__END__
+
+=encoding utf8
+
+=head1 NAME
+
+rfc - Query Request For Comments (RFC)
+
+=head1 SYNOPSIS
+
+rfc --help|-h | --man|m | --version|-v
+
+rfc [--force-index] [--keep] INDEX
+
+rfc [--force-index] --search STRING
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--force-index|-i>
+
+Refresh RFC index file.
+
+=item B<--keep|-k>
+
+Keep requested RFC.
+
+=item B<--search|-s> PATTERN
+
+Search for RFC.
+
+=back
+
+=head1 DESCRIPTION
+
+rfc command line tool to search for RFC's.
+
+=cut
